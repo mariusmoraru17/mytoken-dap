@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MyToken Wallet</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+</head>
+<body>
+<h2>MyToken Wallet Interface</h2>
+
+<button id="connectButton">Connect Wallet</button>
+
+<div id="account"></div>
+<div id="balance"></div>
+
+<h3>Send Tokens</h3>
+<input id="recipient" type="text" placeholder="Recipient address" size="42"/>
+<input id="amount" type="number" placeholder="Amount" />
+<button id="sendButton">Send</button>
+
+<script>
+const tokenAddress = "0x07d2920a5785298C22A6E462EE3Db457DF589D5E"; // Your token address here
+const tokenABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function decimals() view returns (uint8)",
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function totalSupply() view returns (uint256)"
+];
+
+let provider;
+let signer;
+let tokenContract;
+
+const connectButton = document.getElementById("connectButton");
+const accountDiv = document.getElementById("account");
+const balanceDiv = document.getElementById("balance");
+const sendButton = document.getElementById("sendButton");
+
+connectButton.onclick = async () => {
+  if (window.ethereum) {
+    try {
+      await window.ethereum.request({ method: "eth_requestAccounts" });
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      signer = provider.getSigner();
+      tokenContract = new ethers.Contract(tokenAddress, tokenABI, signer);
+
+      const account = await signer.getAddress();
+      accountDiv.innerText = "Connected account: " + account;
+
+      const decimals = await tokenContract.decimals();
+      const balance = await tokenContract.balanceOf(account);
+      const formattedBalance = ethers.utils.formatUnits(balance, decimals);
+      balanceDiv.innerText = `Balance: ${formattedBalance}`;
+
+      connectButton.disabled = true;
+    } catch (error) {
+      alert("Failed to connect wallet: " + error.message);
+    }
+  } else {
+    alert("Please install MetaMask!");
+  }
+};
+
+sendButton.onclick = async () => {
+  const recipient = document.getElementById("recipient").value;
+  const amount = document.getElementById("amount").value;
+
+  if (!ethers.utils.isAddress(recipient)) {
+    alert("Invalid recipient address");
+    return;
+  }
+  if (isNaN(amount) || amount <= 0) {
+    alert("Enter a valid amount");
+    return;
+  }
+
+  try {
+    const decimals = await tokenContract.decimals();
+    const parsedAmount = ethers.utils.parseUnits(amount, decimals);
+
+    const tx = await tokenContract.transfer(recipient, parsedAmount);
+    alert("Transaction sent! Hash: " + tx.hash);
+    await tx.wait();
+
+    alert("Transaction confirmed!");
+    // Update balance
+    const account = await signer.getAddress();
+    const balance = await tokenContract.balanceOf(account);
+    const formattedBalance = ethers.utils.formatUnits(balance, decimals);
+    balanceDiv.innerText = `Balance: ${formattedBalance}`;
+  } catch (error) {
+    alert("Error sending tokens: " + error.message);
+  }
+};
+</script>
+</body>
+</html>
